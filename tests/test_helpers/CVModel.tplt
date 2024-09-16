@@ -1,0 +1,68 @@
+#include "CVModel.h"
+
+#include <utility>
+
+namespace data_models {
+
+template<class BaseModel>
+CVModel<BaseModel>::CVModel(
+        typename BaseModel::Parameter parameter, std::vector<double> radii, size_t cv_split) :
+        _parameter(std::move(parameter)), _radii(std::move(radii)), _cv_split(cv_split) {}
+
+template<class BaseModel>
+bool CVModel<BaseModel>::train(DataModelBase::SampleData const& training_data) {
+    double best_ov = std::numeric_limits<double>::infinity();
+    for (auto const radius: _radii) {
+        double ov_sum = 0;
+        for (size_t cv = 0; cv < _cv_split; ++cv) {
+            auto const [train_split, val_split] = validation_split(cv, training_data);
+            BaseModel model(_parameter, radius);
+            if (not model.train(train_split))
+                return false;
+            auto const score = model.test(val_split);
+            ov_sum += score.mean_objective;
+            _train_time += model.train_time();
+        }
+        if (ov_sum < best_ov) {
+            best_ov = ov_sum;
+            _best_radius = radius;
+        }
+    }
+    _best_model = std::make_unique<BaseModel>(_parameter, _best_radius.value());
+    auto const success = _best_model->train(training_data);
+    _train_time += _best_model->train_time();
+    return success;
+}
+
+template<class BaseModel>
+ScoreOutput CVModel<BaseModel>::test(DataModelBase::SampleData const& test_data) const {
+    return _best_model->test(test_data);
+}
+
+template<class BaseModel>
+double CVModel<BaseModel>::train_time() const {
+    return _train_time;
+}
+
+template<class BaseModel>
+double CVModel<BaseModel>::best_radius() const {
+    return _best_radius.value();
+}
+
+template<class BaseModel>
+std::tuple<DataModelBase::SampleData, DataModelBase::SampleData>
+CVModel<BaseModel>::validation_split(size_t const cv_seed, SampleData const& training_data)
+const {
+    DataModelBase::SampleData train_split;
+    DataModelBase::SampleData val_split;
+    for (size_t i = 0; i < training_data.size(); ++i) {
+        if (i % _cv_split == cv_seed) {
+            val_split.emplace_back(training_data.at(i));
+        } else {
+            train_split.emplace_back(training_data.at(i));
+        }
+    }
+    return {train_split, val_split};
+}
+
+}
