@@ -3,8 +3,9 @@
 This repository implements piecewise affine decision rules using the concept of liftings.
 It provides all relevant code to reproduce the numerical results presented in the paper.
 
-> Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann.
-> "A Note on Piecewise Affine Decision Rules for Robust, Stochastic and Data-Driven Optimization."
+> Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann. (2024).
+> A Note on Piecewise Affine Decision Rules for Robust, Stochastic, and Data-Driven Optimization.
+> *arXiv*. [https://doi.org/10.48550/arXiv.2409.10295](https://doi.org/10.48550/arXiv.2409.10295)
 
 Most of the solvers only implement the special cases needed for the numerical experiments yet.
 We are happy to collaborate on making this a more general-purpose library.
@@ -77,8 +78,9 @@ For more information on the MIT License, please visit [Open Source Initiative](h
 ## Citing This Work
 
 If you use this code in your work, please cite the accompanying paper:
-> Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann.
-> "A Note on Piecewise Affine Decision Rules for Robust, Stochastic and Data-Driven Optimization."
+> Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann. (2024).
+> A Note on Piecewise Affine Decision Rules for Robust, Stochastic, and Data-Driven Optimization.
+> *arXiv*. [https://doi.org/10.48550/arXiv.2409.10295](https://doi.org/10.48550/arXiv.2409.10295)
 
 ## Contact Information
 
