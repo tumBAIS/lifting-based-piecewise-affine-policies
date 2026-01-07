@@ -23,6 +23,8 @@ public:
 
     E const& expression() const;
 
+    E & expression();
+
     double value() const;
 
     template<class S>

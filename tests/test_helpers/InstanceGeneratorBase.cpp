@@ -25,6 +25,9 @@ std::pair<std::unique_ptr<robust_model::ROModel>, std::string> InstanceGenerator
         else{
             instance.first->add_special_uncertainty_constraint(set_type());
         }
+        if (not instance.first->uncertainty_set().has_uncertainty_sampler()){
+            instance.first->non_const_uncertainty_set().set_natural_uniform_uncertainty_sampler();
+        }
         if (instance.first->objective().expression().uncertainty_behaviour() ==
             robust_model::RoAffineExpression::UncertaintyBehaviour::STOCHASTIC) {
             instance.first->set_expectation_provider(std::make_unique<robust_model::SOExpectationProviderEmpirical>(

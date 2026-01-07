@@ -25,8 +25,10 @@ public:
 
     E const& expression() const;
 
+    E& expression();
+
     template<class S>
-    bool feasible(S const& solution, double tolerance=1e-3) const;
+    bool feasible(S const& solution, double tolerance = 1e-3) const;
 
 private:
     ConstraintSense _sense;

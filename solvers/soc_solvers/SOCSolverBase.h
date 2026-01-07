@@ -10,6 +10,8 @@ class SOCSolverBase : public SolverBase{
 public:
     explicit SOCSolverBase(robust_model::SOCModel& soc_model);
 
+    virtual void objectives_reset() = 0;
+
 protected:
     robust_model::SOCModel const& soc_model() const;
     robust_model::SOCModel & non_const_soc_model();

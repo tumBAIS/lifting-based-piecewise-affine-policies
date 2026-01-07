@@ -3,8 +3,8 @@
 
 #include "basic_model_objects/RoAffineExpression.h"
 #include "basic_model_objects/ObjectiveBase.h"
-#include "UncertaintySet.h"
-#include "SOExpectationProvider.h"
+#include "uncertainty/UncertaintySet.h"
+#include "uncertainty/SOExpectationProvider.h"
 #include "../helpers/helpers.h"
 
 namespace robust_model {
@@ -62,6 +62,9 @@ public:
         add_uncertainty_constraint({raw_constraint, name});
     }
 
+    void replace_uncertainty_constraints_with_constraint_sample_sets(std::vector<std::vector<double>> const& samples,
+                                                                     double radius);
+
     UncertaintySetConstraintsSet::Index add_uncertainty_constraint_set();
 
     void add_uncertainty_constraint(UncertaintySet::Constraint const& constraint,
@@ -80,6 +83,8 @@ public:
 
     std::vector<DecisionVariable> const& decision_variables() const;
 
+    std::vector<DecisionVariable> & non_const_decision_variables();
+
     std::vector<DecisionVariable::Index> const& decision_variable_ids() const;
 
     std::vector<UncertaintyVariable> const& uncertainty_variables() const;
@@ -91,6 +96,8 @@ public:
     std::size_t num_uvars() const;
 
     UncertaintySet const& uncertainty_set() const;
+
+    UncertaintySet & non_const_uncertainty_set();
 
     void add_special_uncertainty_constraint(UncertaintySet::SpecialSetType type, double budget=1);
 

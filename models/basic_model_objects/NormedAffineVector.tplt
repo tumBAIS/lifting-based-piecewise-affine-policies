@@ -92,15 +92,16 @@ template<class V>
 double robust_model::NormedAffineVector<V>::accumulated_vector_values(std::vector<double> const& values) const {
     switch (norm_type()) {
         case VectorNormType::One: {
-            return std::accumulate(values.begin(), values.end(), 0.);
+            return std::accumulate(values.begin(), values.end(), 0.,
+                                   [](double acc, double new_elt) { return acc + std::abs(new_elt); });
         }
         case VectorNormType::Two: {
-            return std::accumulate(values.begin(), values.end(), 0.,
-                                   [](double acc, double new_elt) { return acc + new_elt * new_elt; });
+            return std::sqrt(std::accumulate(values.begin(), values.end(), 0.,
+                                             [](double acc, double new_elt) { return acc + new_elt * new_elt; }));
         }
         case VectorNormType::Max: {
             return std::accumulate(values.begin(), values.end(), 0.,
-                                   [](double acc, double new_elt) { return std::max(acc, new_elt); });
+                                   [](double acc, double new_elt) { return std::max(acc, std::abs(new_elt)); });
         }
     }
     helpers::exception_check(false, "Illegal Case!");
@@ -117,7 +118,7 @@ NormedAffineVector<V>::norm(std::vector<AffineExpression<typename V::Reference>>
 template<class V>
 template<class W>
 requires requires(W w) {
-    { w->id()} -> std::same_as<typename V::Index const&>;
+    { w->id() } -> std::same_as<typename V::Index const&>;
 }
 bool NormedAffineVector<V>::is_variable_vector_norm(std::vector<W> const& variables) const {
     if (normed_vector().size() != variables.size())

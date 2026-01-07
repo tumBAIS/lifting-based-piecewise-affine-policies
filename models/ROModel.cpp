@@ -10,7 +10,8 @@ namespace robust_model {
 ROModel::ROModel(std::string name) : _name(std::move(name)), _uncertainty_set(*this) {}
 
 std::vector<ROModel::DecisionReference>
-ROModel::add_decision_variables(std::size_t n, std::string const& name, std::optional<period_id> p, double lb, double ub) {
+ROModel::add_decision_variables(std::size_t n, std::string const& name, std::optional<period_id> p, double lb,
+                                double ub) {
     std::vector<DecisionReference> vars;
     for (std::size_t i = 0; i < n; ++i) {
         vars.emplace_back(add_decision_variable(name + std::to_string(i), p, lb, ub));
@@ -35,7 +36,7 @@ ROModel::add_decision_variable(std::string const& name, std::optional<period_id>
         return dvar;
     }
     auto& non_const_dvar = object(dvar);
-    for (auto const& uvar : uncertainty_variables()) {
+    for (auto const& uvar: uncertainty_variables()) {
         if (uvar.has_period() and uvar.period() <= dvar->period()) {
             non_const_dvar.add_dependency(uvar.id());
         }
@@ -52,7 +53,8 @@ ROModel::add_decision_variable(std::string const& name, std::vector<UncertaintyV
 }
 
 std::vector<ROModel::UncertaintyReference>
-ROModel::add_uncertainty_variables(std::size_t n, std::string const& name, std::optional<period_id> p, double lb, double ub) {
+ROModel::add_uncertainty_variables(std::size_t n, std::string const& name, std::optional<period_id> p, double lb,
+                                   double ub) {
     std::vector<UncertaintyReference> vars;
     for (std::size_t i = 0; i < n; ++i) {
         vars.emplace_back(add_uncertainty_variable(name + std::to_string(i), p, lb, ub));
@@ -76,7 +78,7 @@ ROModel::add_uncertainty_variable(std::string const& name, std::optional<period_
     if (not uvar->has_period()) {
         return uvar;
     }
-    for (auto& dvar : non_const_objects()) {
+    for (auto& dvar: non_const_objects()) {
         if (dvar.has_period() and uvar->period() <= dvar.period()) {
             dvar.add_dependency(uvar);
         }
@@ -90,6 +92,20 @@ void ROModel::add_constraint(RoConstraint const& constraint) {
 
 void ROModel::add_uncertainty_constraint(UncertaintySet::Constraint const& constraint) {
     _uncertainty_set.add_uncertainty_constraint(constraint);
+}
+
+void
+ROModel::replace_uncertainty_constraints_with_constraint_sample_sets(std::vector<std::vector<double>> const& samples,
+                                                                     double radius) {
+    _uncertainty_set.replace_with_constraint_sample_sets(samples, radius);
+    if (_objective.value().expression().uncertainty_behaviour() == RoAffineExpression::UncertaintyBehaviour::STOCHASTIC)
+        _objective.value().expression().set_multi_uncertainty_behaviour(
+                RoAffineExpression::UncertaintyBehaviour::MULTI_AVERAGE);
+    for (auto & constr : _constraints){
+        if (constr.expression().uncertainty_behaviour() == RoAffineExpression::UncertaintyBehaviour::STOCHASTIC)
+            constr.expression().set_multi_uncertainty_behaviour(
+                    RoAffineExpression::UncertaintyBehaviour::MULTI_AVERAGE);
+    }
 }
 
 UncertaintySetConstraintsSet::Index ROModel::add_uncertainty_constraint_set() {
@@ -108,11 +124,12 @@ void ROModel::set_objective(RoAffineExpression const& objective, ObjectiveSense 
 std::string ROModel::full_string() const {
     std::string s = name();
     s += "\n" + objective().to_string();
-    for (auto const& constr : constraints()) {
+    for (auto const& constr: constraints()) {
         s += "\n" + constr.to_string();
     }
-    for (auto const& var:decision_variables()) {
-        s += "\n" + std::to_string(var.lb()) + " <= " + var.name() + " p(" + std::to_string(var.period()) + ") <= " + std::to_string(var.ub());
+    for (auto const& var: decision_variables()) {
+        s += "\n" + std::to_string(var.lb()) + " <= " + var.name() + " p(" + std::to_string(var.period()) + ") <= " +
+             std::to_string(var.ub());
     }
     s += "\n" + uncertainty_set().full_string();
     return s;
@@ -122,11 +139,19 @@ std::vector<DecisionVariable> const& ROModel::decision_variables() const {
     return objects();
 }
 
+std::vector<DecisionVariable>& ROModel::non_const_decision_variables() {
+    return non_const_objects();
+}
+
 std::vector<DecisionVariable::Index> const& ROModel::decision_variable_ids() const {
     return ids();
 }
 
 UncertaintySet const& ROModel::uncertainty_set() const {
+    return _uncertainty_set;
+}
+
+UncertaintySet& ROModel::non_const_uncertainty_set() {
     return _uncertainty_set;
 }
 

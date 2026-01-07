@@ -1,8 +1,9 @@
 #ifndef ROBUSTOPTIMIZATION_UNCERTAINTYSET_H
 #define ROBUSTOPTIMIZATION_UNCERTAINTYSET_H
 
-#include "basic_model_objects/UncertaintyVariable.h"
-#include "basic_model_objects/SOCConstraint.h"
+#include "../basic_model_objects/UncertaintyVariable.h"
+#include "../basic_model_objects/SOCConstraint.h"
+#include "UncertaintySampler.h"
 #include <optional>
 #include <algorithm>
 #include <memory>
@@ -46,7 +47,7 @@ public:
     bool in_constraint_set(R const& realization) const {
         return std::all_of(constraints().begin(), constraints().end(),
                            [realization](Constraint const& constr) {
-                               return constr.template constraint_satisfied(realization);
+                               return constr.constraint_satisfied(realization);
                            });
     }
 
@@ -99,7 +100,7 @@ public:
 
     SpecialSetType special_type() const;
 
-    void add_special_type_constraint(SpecialSetType type, double budget=1);
+    void add_special_type_constraint(SpecialSetType type, double budget = 1);
 
     // in case of multiple constraint sets this will add the constraint to last set!
     void add_uncertainty_constraint(Constraint const& constraint);
@@ -117,6 +118,26 @@ public:
     // Warning this does not invalidate old smart indices!
     // They might simply refer to a new object or exceed the vector length!
     void clear_constraints();
+
+    void replace_with_constraint_sample_sets(std::vector<std::vector<double>> const& samples, double radius);
+
+    void generate_constraint_sample_sets(std::vector<std::vector<double>> const& samples, double radius);
+
+    template<class R>
+    void add_box_constraint_set_for_sample(R const& realization, double radius) {
+        add_constraint_set();
+        for (auto const& variable: variables()) {
+            if (radius == 0) {
+                add_uncertainty_constraint(
+                        {variable.reference() - realization.value(variable.reference()) == 0, "EQ"});
+            } else {
+                add_uncertainty_constraint(
+                        {variable.reference() <= realization.value(variable.reference()) + radius, "UB"});
+                add_uncertainty_constraint(
+                        {variable.reference() >= realization.value(variable.reference()) - radius, "LB"});
+            }
+        }
+    }
 
     std::string full_string() const;
 
@@ -138,11 +159,15 @@ public:
 
     double max_one_norm_k_active(size_t k) const;
 
+    void set_max_one_norm_k_active_lookup(std::vector<double> const& lookup);
+
+    void set_pretend_symmetric_rotational_invariant(bool pretend);
+
     template<class R>
     bool in_uncertainty_set(R const& realization) const {
-        return std::any_of(uncertainty_constraints().begin(), uncertainty_constraints().end(),
-                           [realization](UncertaintySetConstraintsSet const& constr_set) {
-                               return constr_set.template in_constraint_set(realization);
+        return std::any_of(constraint_sets().begin(), constraint_sets().end(),
+                           [realization](UncertaintySetConstraintsSet::Index const& constr_set) {
+                               return constr_set->in_constraint_set(realization);
                            }) and
                std::any_of(variables().begin(), variables().end(),
                            [realization](UncertaintyVariable const& var) {
@@ -151,15 +176,23 @@ public:
                            });
     }
 
+    void set_uncertainty_sampler(std::unique_ptr<UncertaintySamplerBase> uncertainty_sampler);
+
+    void set_natural_uniform_uncertainty_sampler();
+
+    bool has_uncertainty_sampler() const;
+
+    UncertaintySamplerBase const& uncertainty_sampler() const;
+
     std::vector<std::vector<double>> generate_uncertainty(size_t num_realizations) const;
 
-private:
-    std::vector<std::vector<double>> generate_uncertainty_ball(size_t num_realizations) const;
-
-    std::vector<std::vector<double>> generate_uncertainty_budgeted(size_t num_realizations) const;
+    std::vector<std::vector<double>> generate_uncertainty_tree(size_t num_children) const;
 
 private:
     ROModel const& _model;
+    std::optional<std::vector<double>> _max_one_norm_k_active_lookup;
+    std::unique_ptr<UncertaintySamplerBase> _uncertainty_sampler;
+    bool _pretend_symmetric_rotational_invariant = false;
 };
 
 }

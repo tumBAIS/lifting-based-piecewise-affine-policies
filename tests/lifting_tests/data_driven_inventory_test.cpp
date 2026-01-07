@@ -69,7 +69,7 @@ private:
     size_t _train_size_options_it = 0;
     std::vector<double> const _alpha_options = {0., .25, .5};
     size_t _alpha_options_it = 0;
-    std::vector<double> const _overage_options = {0.02};
+    std::vector<double> const _overage_options = {0.04};
     size_t _overage_options_it = 0;
     std::vector<double> const _eoh_underage_options = {2.};
     size_t _eoh_underage_options_it = 0;
@@ -78,22 +78,32 @@ private:
 
 std::vector<std::vector<double>> generate_data(size_t const size, size_t const T, double const alpha) {
     double const base_demand = 200;
-    double const fluctuation = base_demand / double(T);
+    double const nu = base_demand/ std::sqrt(double(T));
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(-fluctuation, fluctuation);
+    robust_model::ROModel dummy_model("DummyModel");
+    dummy_model.add_uncertainty_variables(T, "demand", 0, 0, 2*base_demand);
 
-    std::vector<std::vector<double>> data(size, std::vector<double>(T));
-    for (auto& sample: data) {
-        double prev_demand = base_demand;
-        for (auto& point: sample) {
-            double const this_demand = dis(gen);
-            point = prev_demand + this_demand;
-            prev_demand += alpha * this_demand;
-        }
+    auto base_uncertainty = std::make_unique<robust_model::UncertaintySet>(dummy_model);
+    std::vector<robust_model::SOCExpression<robust_model::UncertaintyVariable>> transformation;
+    robust_model::SOCExpression<robust_model::UncertaintyVariable> previous_uncertainty(base_demand);
+    for (std::size_t t = 0; t < T; ++t) {
+        auto const lastvar = base_uncertainty->add_variable(
+                "base_uncertainty" + std::to_string(t), t, -nu, nu);
+        transformation.emplace_back(previous_uncertainty + lastvar);
+        previous_uncertainty += alpha * lastvar;
     }
-    return data;
+    base_uncertainty->add_special_type_constraint(robust_model::UncertaintySet::SpecialSetType::BALL, nu);
+    auto base_uncertainty_sampler = std::make_unique<robust_model::UniformL2BallRejectUncertaintySampler>(
+            *base_uncertainty, nu, false);
+
+    dummy_model.non_const_uncertainty_set().set_uncertainty_sampler(
+            std::make_unique<robust_model::OwningTransformedUncertaintySampler>(
+            dummy_model.uncertainty_set(),
+            std::move(base_uncertainty),
+            std::move(base_uncertainty_sampler),
+            std::move(transformation)));
+
+    return dummy_model.uncertainty_set().generate_uncertainty(size);
 }
 
 std::string test(Parameter const& parameter) {
@@ -158,13 +168,13 @@ std::string test(Parameter const& parameter) {
 
 
 int main() {
-    std::string run_name = "data_driven_inventory_" + helpers::time_stamp();
+    std::string run_name = "data_driven_inventory_revision_" + helpers::time_stamp();
     std::ofstream output_stream("../results/" + run_name + ".csv");
     helpers::global_logger.set_logfile("../logs/" + run_name + ".log");
     ParameterIterator iterator;
     data_models::ParallelDataInstanceEvaluator<Parameter> evaluator(iterator, test, output_stream);
     output_stream
-            << "cross_validation; iteration; train_size; num_stages; alpha; overage_cost; eoh_underage; method; radius; train_time; train_mean; train_std; test_mean; test_std"
+            << "cross_validation; iteration; train_size; num_stages; alpha; overage_cost; eoh_underage; method; radius; train_time; train_mean; train_std; train_valid; test_mean; test_std; test_valid"
             << std::endl;
     evaluator.run_tests(6);
     helpers::global_logger << "END OF TESTS!";

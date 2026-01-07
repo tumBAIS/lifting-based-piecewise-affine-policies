@@ -141,6 +141,8 @@ SOCExpression<V> SOCExpression<V>::norm(Iter const& iter, VectorNormType norm_ty
 template<class V>
 template<class S>
 double SOCExpression<V>::value(S const& solution) const {
+    if(is_affine())
+        return affine().value(solution);
     return normed_vector().value(solution) + affine().value(solution);
 }
 

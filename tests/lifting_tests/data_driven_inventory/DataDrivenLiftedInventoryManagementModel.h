@@ -12,7 +12,6 @@ public:
     enum class Mode {
         AFFINE,
         LIFTED_EQUIDISTANT,
-        LIFTED_EQUIDISTANT_OLD,
         LIFTED_PERCENTILES
     };
 
@@ -22,8 +21,6 @@ public:
                 return "AFF";
             case Mode::LIFTED_EQUIDISTANT:
                 return "LIFTE";
-            case Mode::LIFTED_EQUIDISTANT_OLD:
-                return "LIFTEOLD";
             case Mode::LIFTED_PERCENTILES:
                 return "LIFTP";
         }
@@ -54,13 +51,13 @@ private:
 
     solvers::SolverBase const& active_solver() const;
 
-    std::tuple<std::vector<double>, std::vector<double>> get_uncertainty_bounds(SampleData const& training_data) const;
-
     void solve_ro_model(SampleData const& training_data);
 
     robust_model::SolutionRealization realization(DataPoint const& sample) const;
 
-    double realization_objective(robust_model::SolutionRealization const& realization) const;
+    std::tuple<double, bool> realization_objective(robust_model::SolutionRealization const& realization) const;
+
+    double max_total_backlog(size_t T) const;
 
     std::vector<robust_model::SingleDirectionBreakPoints::BreakPointsSeries> calculate_equidistant_percentiles(
             size_t num_pieces,
@@ -80,14 +77,14 @@ private:
 
     robust_model::ROModel _model;
 
-    double const _max_order = 260;
-    double const _order_cost = .1;
+    double const _max_order = 200;
+    double const _deviation_cost = .1;
     double const _overage_cost;
     double const _underage_cost = .2;
     double const _underage_cost_last;
-    double const _early_order_cost = 0.;
+    double const _early_order_cost = 0.01;
 
-    std::vector<robust_model::DecisionVariable::Reference> _reordering_quantities;
+    std::vector<robust_model::DecisionVariable::Reference> _order_deviation;
     std::vector<robust_model::DecisionVariable::Reference> _early_ordering_quantities;
 };
 

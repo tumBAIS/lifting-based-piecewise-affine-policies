@@ -14,6 +14,9 @@ double SolutionRealization::value(UncertaintyVariable::Index uvar) const {
 }
 
 double SolutionRealization::value(DecisionVariable::Index dvar) const {
+    if(dvar->has_exact_evaluation()){
+        return dvar->exact_evaluation(*this);
+    }
     return _solutions.at(dvar.raw_id());
 }
 

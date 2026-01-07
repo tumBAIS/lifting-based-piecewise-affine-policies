@@ -1,4 +1,7 @@
 #include "helpers.h"
+#include <algorithm>
+#include <ranges>
+#include <numeric>
 
 namespace helpers {
 
@@ -9,7 +12,7 @@ std::size_t IndexedObjectOwner<ObjT>::num_objects() const {
 
 template<class ObjT>
 template<class... Args>
-SmartIndex <ObjT> IndexedObjectOwner<ObjT>::base_add_object(Args&& ... args) {
+SmartIndex<ObjT> IndexedObjectOwner<ObjT>::base_add_object(Args&& ... args) {
     return _ids.emplace_back(
             _objects.emplace_back(next_id(), std::forward<Args>(args)...).id()
     );
@@ -34,7 +37,7 @@ void IndexedObjectOwner<ObjT>::clear() {
 }
 
 template<class ObjT>
-SmartIndex <ObjT> IndexedObjectOwner<ObjT>::next_id() const {
+SmartIndex<ObjT> IndexedObjectOwner<ObjT>::next_id() const {
     return IdT(_objects.size(), this);
 }
 
@@ -49,12 +52,12 @@ std::vector<ObjT> const& IndexedObjectOwner<ObjT>::objects() const {
 }
 
 template<class ObjT>
-std::vector<ObjT> & IndexedObjectOwner<ObjT>::non_const_objects() {
+std::vector<ObjT>& IndexedObjectOwner<ObjT>::non_const_objects() {
     return _objects;
 }
 
 template<class ObjT>
-SmartIndex<ObjT>::SmartIndex(size_t const id, Owner const* owner) : _id(id), _owner(owner) {}
+SmartIndex<ObjT>::SmartIndex(size_t const id, Owner const *owner) : _id(id), _owner(owner) {}
 
 template<class ObjT>
 typename SmartIndex<ObjT>::Owner const& SmartIndex<ObjT>::owner() const {
@@ -62,7 +65,7 @@ typename SmartIndex<ObjT>::Owner const& SmartIndex<ObjT>::owner() const {
 }
 
 template<class ObjT>
-ObjT const* SmartIndex<ObjT>::operator->() const {
+ObjT const *SmartIndex<ObjT>::operator->() const {
     return &owner().object(*this);
 }
 
@@ -79,7 +82,7 @@ auto SmartIndex<ObjT>::operator!=(SmartIndex<ObjT> const& other) const {
 }
 
 template<class ObjT>
-auto SmartIndex<ObjT>::operator<=>(SmartIndex <ObjT> const& other) const {
+auto SmartIndex<ObjT>::operator<=>(SmartIndex<ObjT> const& other) const {
     exception_check(this->_owner == other._owner, "Ids not from same Owner!");
     return size_t(*this) <=> size_t(other);
 }
@@ -95,14 +98,32 @@ size_t SmartIndex<ObjT>::raw_id() const {
 }
 
 template<class ObjT>
-IndexedObject<ObjT>::IndexedObject(SmartIndex <ObjT> id) : _id(id) {
+IndexedObject<ObjT>::IndexedObject(SmartIndex<ObjT> id) : _id(id) {
 
 }
 
 template<class ObjT>
-SmartIndex <ObjT> const& IndexedObject<ObjT>::id() const {
+SmartIndex<ObjT> const& IndexedObject<ObjT>::id() const {
     return _id;
 }
 
+template<class T>
+std::tuple<std::vector<size_t>, std::vector<T>> sort(std::vector<T> const& v, bool ascending) {
+    std::vector<size_t> indices(v.size());
+    std::iota(indices.begin(), indices.end(), 0); // Fill with 0,1,2,...
+
+    if (ascending)
+        std::ranges::sort(indices, [&](size_t i, size_t j) { return v[i] < v[j]; });
+    else
+        std::ranges::sort(indices, [&](size_t i, size_t j) { return v[i] > v[j]; });
+
+
+    std::vector<T> sorted_v(v.size());
+    for (size_t i = 0; i < v.size(); ++i) {
+        sorted_v[i] = v[indices[i]];
+    }
+
+    return {indices, sorted_v};
+}
 
 }

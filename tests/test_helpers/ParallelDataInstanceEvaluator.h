@@ -2,6 +2,7 @@
 #define ROBUSTOPTIMIZATION_PARALLELDATAINSTANCEEVALUATOR_H
 
 #include <functional>
+#include <thread>
 #include "../../helpers/helpers.h"
 
 namespace data_models {

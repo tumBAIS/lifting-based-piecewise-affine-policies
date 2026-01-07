@@ -37,6 +37,11 @@ E const& RawConstraint<E>::expression() const {
 }
 
 template<class E>
+E & RawConstraint<E>::expression() {
+    return _expression;
+}
+
+template<class E>
 template<class S>
 bool RawConstraint<E>::feasible(S const& solution, double tolerance) const {
     double lhs = expression().value(solution);

@@ -147,6 +147,9 @@ private:
 double mean(std::vector<double> const& data);
 double variance(std::vector<double> const& data);
 double standard_deviation(std::vector<double> const& data);
+
+template <class T>
+std::tuple<std::vector<size_t>, std::vector<T>> sort(std::vector<T> const& v, bool ascending=false);
 }
 
 #include "helpers.tplt"

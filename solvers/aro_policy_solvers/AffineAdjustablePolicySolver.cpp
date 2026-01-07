@@ -80,46 +80,17 @@ AffineAdjustablePolicySolver::add_robust_counterpart_constraints_for_minimizatio
 AffineExpression<SOCVariable::Reference>
 AffineAdjustablePolicySolver::add_stochastic_counterpart_constraints_for_minimization(RoAffineExpression const& expr,
                                                                                       std::string const& name_addendum) {
-    auto const adjustable_factors_scales = model().expectation_provider().expected_value(
-            [&](UncertaintyRealization const& realization) {
-                std::vector<std::vector<double>> factors(model().num_dvars(),
-                                                         std::vector<double>(model().num_uvars(), 0.));
-                for (auto const& svar: expr.decisions().scaled_variables()) {
-                    for (auto const& uvar: svar.variable()->dependencies()) {
-                        factors.at(svar.variable().raw_id()).at(uvar.raw_id()) +=
-                                svar.scale() * realization.value(uvar);
-                    }
-                }
-                for (auto const& svar: expr.uncertainty_decisions().scaled_variables()) {
-                    for (auto const& uvar: svar.variable().decision_variable()->dependencies()) {
-                        factors.at(svar.variable().decision_variable().raw_id()).at(uvar.raw_id()) +=
-                                svar.scale() *
-                                realization.value(uvar) *
-                                realization.value(svar.variable().uncertainty_variable());
-                    }
-                }
-                return factors;
-            });
-    auto const adjustable_constants_scales = model().expectation_provider().expected_value(
-            [&](UncertaintyRealization const& realization) {
-                std::vector<double> factors(model().num_dvars(), 0.);
-                for (auto const& svar: expr.decisions().scaled_variables()) {
-                    factors.at(svar.variable().raw_id()) +=
-                            svar.scale();
-                }
-                for (auto const& svar: expr.uncertainty_decisions().scaled_variables()) {
-                    factors.at(svar.variable().decision_variable().raw_id()) +=
-                            svar.scale() *
-                            realization.value(svar.variable().uncertainty_variable());
-                }
-                return factors;
-            });
-    AffineExpression<SOCVariable::Reference> res_expr(expr.constant());
+    auto const expectations_helper = AffinePolicyExpectationHelper(model());
+    auto const adjustable_factors_scales = expectations_helper.expected_adjustable_factor_scales(expr);
+    auto const adjustable_constants_scales = expectations_helper.expected_adjustable_constant_scales(expr);
+    auto const expected_constant = expectations_helper.expected_constant(expr);
+
+    AffineExpression<SOCVariable::Reference> res_expr(expected_constant);
     for (auto const& dvar: model().decision_variables()) {
-        for (auto const& uvar: model().uncertainty_variables()) {
-            if (adjustable_factors_scales.at(dvar.id().raw_id()).at(uvar.id().raw_id()) != 0)
-                res_expr += adjustable_factors_scales.at(dvar.id().raw_id()).at(uvar.id().raw_id()) *
-                            adjustable_factors(dvar.id()).at(uvar.id().raw_id());
+        for (auto const& dependency: dvar.dependencies()) {
+            if (adjustable_factors_scales.at(dvar.id().raw_id()).at(dependency.id().raw_id()) != 0)
+                res_expr += adjustable_factors_scales.at(dvar.id().raw_id()).at(dependency.id().raw_id()) *
+                            adjustable_factor(dependency);
         }
         if (adjustable_constants_scales.at(dvar.id().raw_id()) != 0)
             res_expr += adjustable_constants_scales.at(dvar.id().raw_id()) *
@@ -140,9 +111,9 @@ void AffineAdjustablePolicySolver::add_rc_constraints_for_equality(RoAffineExpre
     }
     for (auto const& sdvar: expr.decisions().scaled_variables()) {
         adjustable_constants_equation += sdvar.scale() * adjustable_constant(sdvar.variable());
-        for (size_t i = 0; i < sdvar.variable()->dependencies().size(); ++i) {
-            adjustable_factor_equations[sdvar.variable()->dependencies()[i].raw_id()] +=
-                    sdvar.scale() * adjustable_factors(sdvar.variable()).at(i);
+        for (auto const& dependency: sdvar.variable()->dependencies()) {
+            adjustable_factor_equations[dependency.uncertainty_variable().raw_id()] +=
+                    sdvar.scale() * adjustable_factor(dependency);
         }
     }
     for (auto const& usdvar: expr.uncertainty_decisions().scaled_variables()) {
@@ -228,9 +199,9 @@ AffineAdjustablePolicySolver::add_dual_of_expression(AffineExpression<SOCVariabl
         dual_constraint_expressions[suvar.variable().raw_id()] += suvar.scale();
     }
     for (auto const& sdvar: expr.decisions().scaled_variables()) {
-        for (size_t i = 0; i < sdvar.variable()->dependencies().size(); ++i) {
-            dual_constraint_expressions[sdvar.variable()->dependencies()[i].raw_id()] +=
-                    sdvar.scale() * adjustable_factors(sdvar.variable()).at(i);
+        for (auto const& dependency: sdvar.variable()->dependencies()) {
+            dual_constraint_expressions[dependency.uncertainty_variable().raw_id()] +=
+                    sdvar.scale() * adjustable_factor(dependency);
         }
         dual_objective += sdvar.scale() * adjustable_constant(sdvar.variable());
     }
@@ -258,10 +229,8 @@ void AffineAdjustablePolicySolver::solve_implementation() {
 
 AffineSolution AffineAdjustablePolicySolver::affine_solution(DecisionVariable::Index const dvar) const {
     std::map<UncertaintyVariable::Index, double> dependent_scales;
-    auto const& factors = adjustable_factors(dvar);
-    auto const& dependencies = dvar->dependencies();
-    for (size_t i = 0; i < dvar->dependencies().size(); ++i) {
-        dependent_scales[dependencies.at(i)] = factors.at(i)->solution();
+    for (auto const& dependency: dvar->dependencies()) {
+        dependent_scales[dependency.uncertainty_variable()] = adjustable_factor(dependency)->solution();
     }
     return AffineSolution(adjustable_constant(dvar)->solution(), dependent_scales);
 }
@@ -269,9 +238,10 @@ AffineSolution AffineAdjustablePolicySolver::affine_solution(DecisionVariable::I
 void AffineAdjustablePolicySolver::build_variables() {
     for (auto const& var: model().decision_variables()) {
         _adjustable_factors.emplace_back();
-        for (auto const dependency: var.dependencies()) {
+        for (auto const& dependency: var.dependencies()) {
             _adjustable_factors.back().emplace_back(
-                    soc_model().add_variable("AV_" + var.name() + dependency->name(), NO_VARIABLE_LB, NO_VARIABLE_UB));
+                    soc_model().add_variable("AV_" + var.name() + dependency.uncertainty_variable()->name(),
+                                             NO_VARIABLE_LB, NO_VARIABLE_UB));
         }
     }
     for (auto const& var: model().decision_variables()) {
@@ -312,22 +282,24 @@ void AffineAdjustablePolicySolver::build_objective() {
     }
 }
 
-std::vector<SOCVariable::Reference> const& AffineAdjustablePolicySolver::adjustable_factors(DecisionVariable::Index id) const {
-    return _adjustable_factors.at(id.raw_id());
+SOCVariable::Reference const& AffineAdjustablePolicySolver::adjustable_factor(
+        DecisionVariable::Dependency const& dependency) const {
+    return _adjustable_factors.at(dependency.decision_variable().raw_id()).at(dependency.id().raw_id());
 }
 
 SOCVariable::Reference const& AffineAdjustablePolicySolver::adjustable_constant(DecisionVariable::Index id) const {
     return _adjustable_constants.at(id.raw_id());
 }
 
-SolutionRealization AffineAdjustablePolicySolver::specific_solution(std::vector<double> const& uncertainty_realization) const {
+SolutionRealization
+AffineAdjustablePolicySolver::specific_solution(std::vector<double> const& uncertainty_realization) const {
     std::vector<double> solutions(model().num_dvars(), 0);
     for (auto const& dvar: model().decision_variables()) {
         solutions.at(dvar.id().raw_id()) = adjustable_constant(dvar.id())->solution();
-        for (size_t i = 0; i < dvar.dependencies().size(); ++i) {
+        for (auto const& dependency: dvar.dependencies()) {
             solutions.at(dvar.id().raw_id()) +=
-                    uncertainty_realization.at(dvar.dependencies().at(i).raw_id())
-                    * adjustable_factors(dvar.id()).at(i)->solution();
+                    uncertainty_realization.at(dependency.uncertainty_variable().raw_id())
+                    * adjustable_factor(dependency)->solution();
         }
     }
     return SolutionRealization(model(), uncertainty_realization, solutions);
@@ -341,13 +313,14 @@ void AffineAdjustablePolicySolver::add_average_reoptimization() {
     );
 }
 
-void AffineAdjustablePolicySolver::add_reoptimization_objective_for_realization(UncertaintyRealization const& realization) {
+void
+AffineAdjustablePolicySolver::add_reoptimization_objective_for_realization(UncertaintyRealization const& realization) {
     helpers::exception_check(built(), "Can only add extra objectives, when base model is built!");
     std::vector<AffineExpression<SOCVariable::Reference>> decision_substitutions;
     for (auto const& dvar: model().decision_variables()) {
         AffineExpression<SOCVariable::Reference> replacement(adjustable_constant(dvar.id()));
-        for (size_t i = 0; i < dvar.dependencies().size(); ++i) {
-            replacement += adjustable_factors(dvar.id()).at(i) * realization.value(dvar.dependencies().at(i));
+        for (auto const& dependency: dvar.dependencies()) {
+            replacement += adjustable_factor(dependency);
         }
         decision_substitutions.emplace_back(replacement);
     }
@@ -366,6 +339,66 @@ SOCModel& AffineAdjustablePolicySolver::soc_model() {
 
 solvers::SOCSolverBase& AffineAdjustablePolicySolver::soc_solver() {
     return *_soc_solver;
+}
+
+
+AffinePolicyExpectationHelper::AffinePolicyExpectationHelper(ROModel const& model) : _model(model) {}
+
+std::vector<std::vector<double>> AffinePolicyExpectationHelper::expected_adjustable_factor_scales(
+        RoAffineExpression const& expression) const {
+    return model().expectation_provider().expected_value(
+            [&](UncertaintyRealization const& realization) {
+                std::vector<std::vector<double>> factors(model().num_dvars());
+                for (auto const& dvar: model().decision_variables()) {
+                    factors[dvar.id().raw_id()] = std::vector<double>(dvar.num_dependencies(), 0.);
+                }
+                for (auto const& svar: expression.decisions().scaled_variables()) {
+                    for (auto const& dependency: svar.variable()->dependencies()) {
+                        factors.at(svar.variable().raw_id()).at(dependency.id().raw_id()) +=
+                                svar.scale() * realization.value(dependency.uncertainty_variable());
+                    }
+                }
+                for (auto const& svar: expression.uncertainty_decisions().scaled_variables()) {
+                    for (auto const& dependency: svar.variable().decision_variable()->dependencies()) {
+                        factors.at(svar.variable().decision_variable().raw_id()).at(dependency.id().raw_id()) +=
+                                svar.scale() *
+                                realization.value(dependency.uncertainty_variable()) *
+                                realization.value(svar.variable().uncertainty_variable());
+                    }
+                }
+                return factors;
+            });
+}
+
+std::vector<double> AffinePolicyExpectationHelper::expected_adjustable_constant_scales(
+        RoAffineExpression const& expression) const {
+    return model().expectation_provider().expected_value(
+            [&](UncertaintyRealization const& realization) {
+                std::vector<double> factors(model().num_dvars(), 0.);
+                for (auto const& svar: expression.decisions().scaled_variables()) {
+                    factors.at(svar.variable().raw_id()) +=
+                            svar.scale();
+                }
+                for (auto const& svar: expression.uncertainty_decisions().scaled_variables()) {
+                    factors.at(svar.variable().decision_variable().raw_id()) +=
+                            svar.scale() *
+                            realization.value(svar.variable().uncertainty_variable());
+                }
+                return factors;
+            });
+}
+
+double AffinePolicyExpectationHelper::expected_constant(
+        RoAffineExpression const& expression) const {
+    return model().expectation_provider().expected_value(
+            [&](UncertaintyRealization const& realization) {
+                return expression.uncertainties().value(realization);
+            })
+           + expression.constant();
+}
+
+ROModel const& AffinePolicyExpectationHelper::model() const {
+    return _model;
 }
 
 

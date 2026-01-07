@@ -80,7 +80,10 @@ void GurobiSOCSolver::update_soc_constraints() {
                 auto expr = GRBQuadExpr();
                 for (auto const& affine: constr.soc_expression().normed_vector().normed_vector()) {
                     auto const lin_expr = to_gurobi_linear(affine);
-                    expr += lin_expr * lin_expr;
+                    auto const sub = gurobi_model().addVar(
+                            robust_model::NO_VARIABLE_LB, robust_model::NO_VARIABLE_UB, 0, GRB_CONTINUOUS);
+                    gurobi_model().addConstr(sub == lin_expr);
+                    expr += sub * sub;
                 }
                 auto const lin_expr = to_gurobi_linear(constr.soc_expression().affine());
                 gurobi_model().addQConstr(expr, to_grb_sense(constr.sense()), lin_expr * lin_expr, constr.name());

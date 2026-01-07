@@ -23,6 +23,12 @@ E const& ObjectiveBase<E>::expression() const {
 }
 
 template<class E>
+E& ObjectiveBase<E>::expression() {
+    return _expression;
+}
+
+
+template<class E>
 double ObjectiveBase<E>::value() const {
     return _value.value();
 }

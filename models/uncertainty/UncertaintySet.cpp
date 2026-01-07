@@ -2,9 +2,9 @@
 #include <utility>
 #include <set>
 #include "UncertaintySet.h"
-#include "ROModel.h"
-#include "SOCModel.h"
-#include "../helpers/helpers.h"
+#include "../ROModel.h"
+#include "../SOCModel.h"
+#include "../../helpers/helpers.h"
 
 namespace robust_model {
 
@@ -78,7 +78,7 @@ bool UncertaintySetConstraintsSet::is_norm_ball() const {
 
 double UncertaintySetConstraintsSet::budget() const {
     helpers::exception_check(is_norm_ball(), "Can only find budget for norm balls!");
-    return - constraints().front().expression().affine().constant();
+    return -constraints().front().expression().affine().constant();
 }
 
 
@@ -150,6 +150,8 @@ UncertaintySet::add_special_type_constraint(UncertaintySet::SpecialSetType type,
                     variables(), VectorNormType::One) <= budget,
                                         "BudgetConstraint"});
             return;
+        case SpecialSetType::OTHER:
+            return;
         default:
             helpers::exception_throw("No special Constraint or not implemented!");
     }
@@ -159,7 +161,7 @@ double
 UncertaintySet::budget() const {
     helpers::exception_check(constraint_sets().size() == 1,
                              "Can only find budget for single norm balls!"
-                             );
+    );
     return constraint_sets().front()->budget();
 }
 
@@ -198,6 +200,18 @@ void UncertaintySet::clear_constraints() {
     add_constraint_set();
 }
 
+void
+UncertaintySet::replace_with_constraint_sample_sets(std::vector<std::vector<double>> const& samples, double radius) {
+    helpers::IndexedObjectOwner<robust_model::UncertaintySetConstraintsSet>::clear();
+    generate_constraint_sample_sets(samples, radius);
+}
+
+void UncertaintySet::generate_constraint_sample_sets(std::vector<std::vector<double>> const& samples, double radius) {
+    for (auto const& sample: samples) {
+        add_box_constraint_set_for_sample(UncertaintyRealization(sample), radius);
+    }
+}
+
 std::string
 UncertaintySet::full_string() const {
     std::string s = "Uncertainty Set of " + model().name() + "\n";
@@ -214,87 +228,6 @@ UncertaintySet::full_string() const {
     return s;
 }
 
-std::vector<std::vector<double>> UncertaintySet::generate_uncertainty(size_t const num_realizations) const {
-    switch (special_type()) {
-        case SpecialSetType::BALL:
-            return generate_uncertainty_ball(num_realizations);
-        case SpecialSetType::BUDGET:
-            return generate_uncertainty_budgeted(num_realizations);
-        default:
-            helpers::exception_check(false, "Only BALL and BUDGET implemented yet!");
-    }
-    return {};
-}
-
-std::vector<std::vector<double>> UncertaintySet::generate_uncertainty_ball(size_t num_realizations) const {
-    helpers::exception_check(all_bounded_variables(),
-                             "Generation of uncertain samples only makes sense for bounded uncertainty!");
-    bool const non_neg = non_negative();
-
-    std::ranlux48 generator(std::chrono::system_clock::now().time_since_epoch().count());
-    std::normal_distribution<double> normal_distribution(0., 1.);
-    std::uniform_real_distribution<double> uniform_distribution(0., 1.);
-
-    std::vector<std::vector<double>> realizations(num_realizations, std::vector<double>(num_variables()));
-    bool previous_in_set = true;
-    for (size_t i = 0; i < num_realizations; i += previous_in_set) {
-        previous_in_set = true;
-        auto& realization = realizations.at(i);
-        double norm = 0;
-        for (size_t j = 0; j < num_variables(); ++j) {
-            double rn = non_neg ? std::abs(normal_distribution(generator)) : normal_distribution(generator);
-            realization[j] = rn;
-            norm += rn * rn;
-        }
-        norm = std::sqrt(norm);
-        double const radius = std::pow(uniform_distribution(generator), 1. / double(num_variables())) * budget();
-        double const scale = radius / norm;
-        for (size_t j = 0; j < num_variables(); ++j) {
-            realization[j] *= scale;
-            if ((realization[j] < variables().at(j).lb()) or
-                (realization[j] > variables().at(j).ub())){
-                previous_in_set = false;
-                break;
-            }
-        }
-    }
-    helpers::exception_check(previous_in_set, "When done, the last realization should be valid!");
-    return realizations;
-}
-
-std::vector<std::vector<double>> UncertaintySet::generate_uncertainty_budgeted(size_t num_realizations) const {
-    helpers::exception_check(all_bounded_variables(),
-                             "Generation of uncertain samples only makes sense for bounded uncertainty!");
-    bool const non_neg = non_negative();
-
-    std::ranlux48 generator(std::chrono::system_clock::now().time_since_epoch().count());
-    std::exponential_distribution<double> exponential_distribution(1.);
-    std::uniform_int_distribution<> sign_generator(0, 1);
-
-    std::vector<std::vector<double>> realizations(num_realizations, std::vector<double>(num_variables()));
-    bool previous_in_set = true;
-    for (size_t i = 0; i < num_realizations; i += previous_in_set) {
-        previous_in_set = true;
-        auto& realization = realizations.at(i);
-        double one_norm = exponential_distribution(generator);
-        for (size_t j = 0; j < num_variables(); ++j) {
-            double rn = exponential_distribution(generator);
-            realization[j] = rn * ((non_neg or sign_generator(generator)==1) ? 1. : -1.);
-            one_norm += rn;
-        }
-        double const scale = budget() / one_norm;
-        for (size_t j = 0; j < num_variables(); ++j) {
-            realization[j] *= scale;
-            if ((realization[j] < variables().at(j).lb()) or
-                (realization[j] > variables().at(j).ub())){
-                previous_in_set = false;
-                break;
-            }
-        }
-    }
-    helpers::exception_check(previous_in_set, "When done, the last realization should be valid!");
-    return realizations;
-}
 
 std::vector<UncertaintyVariable::Index> const& UncertaintySet::indices() const {
     return helpers::IndexedObjectOwner<UncertaintyVariable>::ids();
@@ -327,6 +260,8 @@ bool UncertaintySet::all_bounded_variables() const {
 }
 
 bool UncertaintySet::rotational_invariant() const {
+    if (_pretend_symmetric_rotational_invariant)
+        return true;
     if (not std::set{SpecialSetType::BOX,
                      SpecialSetType::BUDGET,
                      SpecialSetType::BALL}.contains(special_type())) {
@@ -343,6 +278,8 @@ bool UncertaintySet::rotational_invariant() const {
 }
 
 bool UncertaintySet::symmetric() const {
+    if (_pretend_symmetric_rotational_invariant)
+        return true;
     if (not std::set{SpecialSetType::BOX,
                      SpecialSetType::BUDGET,
                      SpecialSetType::BALL}.contains(special_type())) {
@@ -366,6 +303,10 @@ double UncertaintySet::max_one_norm_k_active(size_t k) const {
         return 0;
     }
     helpers::exception_check(k <= num_variables(), "Can't have more then num_var active variables!");
+
+    if (_max_one_norm_k_active_lookup.has_value()) {
+        return _max_one_norm_k_active_lookup.value().at(k - 1);
+    }
     if (rotational_invariant()) {
         double max_bound = std::max(-variables().front().lb(), variables().front().ub());
         double const box_bound = double(k) * max_bound;
@@ -376,12 +317,62 @@ double UncertaintySet::max_one_norm_k_active(size_t k) const {
             case SpecialSetType::BUDGET:
                 return std::min(box_bound, budget());
             case SpecialSetType::BALL:
-                return std::min(box_bound, std::sqrt(double(k))*budget());
+                return std::min(box_bound, std::sqrt(double(k)) * budget());
             default:
                 helpers::exception_throw("Not implemented!");
         }
     }
     helpers::exception_throw("Not implemented!");
 }
+
+void UncertaintySet::set_max_one_norm_k_active_lookup(std::vector<double> const& lookup) {
+    helpers::exception_check(lookup.size() == num_variables(), "Provide lookup value for each k!");
+    _max_one_norm_k_active_lookup = lookup;
+}
+
+void UncertaintySet::set_pretend_symmetric_rotational_invariant(bool pretend) {
+    _pretend_symmetric_rotational_invariant = pretend;
+}
+
+void UncertaintySet::set_uncertainty_sampler(std::unique_ptr<UncertaintySamplerBase> uncertainty_sampler) {
+    _uncertainty_sampler = std::move(uncertainty_sampler);
+}
+
+void UncertaintySet::set_natural_uniform_uncertainty_sampler() {
+    switch (special_type()) {
+        case SpecialSetType::BOX:
+            set_uncertainty_sampler(std::make_unique<UniformBoxRejectUncertaintySampler>(
+                    *this));
+            return;
+        case SpecialSetType::BALL:
+            set_uncertainty_sampler(std::make_unique<UniformL2BallRejectUncertaintySampler>(
+                    *this, budget(), non_negative()));
+            return;
+        case SpecialSetType::BUDGET:
+            set_uncertainty_sampler(std::make_unique<UniformL1BallRejectUncertaintySampler>(
+                    *this, budget(), non_negative()));
+            return;
+        case SpecialSetType::OTHER:
+            helpers::exception_throw("There is no natural uniform uncertainty sampler for this case!");
+    }
+}
+
+bool UncertaintySet::has_uncertainty_sampler() const {
+    return _uncertainty_sampler != nullptr;
+}
+
+UncertaintySamplerBase const& UncertaintySet::uncertainty_sampler() const {
+    return *_uncertainty_sampler;
+}
+
+std::vector<std::vector<double>> UncertaintySet::generate_uncertainty(size_t const num_realizations) const {
+    return uncertainty_sampler().sample(num_realizations);
+}
+
+std::vector<std::vector<double>>
+UncertaintySet::generate_uncertainty_tree(size_t num_children) const {
+    return uncertainty_sampler().sample_tree(num_children);
+}
+
 
 }

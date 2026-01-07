@@ -19,7 +19,7 @@ public:
 
     double value(robust_model::SOCVariable::Index const& id) const;
 
-    void objectives_reset();
+    void objectives_reset() final;
 
 private:
     void solve_implementation() final;

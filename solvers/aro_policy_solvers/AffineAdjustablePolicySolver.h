@@ -9,6 +9,24 @@
 
 namespace robust_model {
 
+class AffinePolicyExpectationHelper{
+public:
+    explicit AffinePolicyExpectationHelper(ROModel const& model);
+
+    std::vector<std::vector<double>> expected_adjustable_factor_scales(RoAffineExpression const& expression) const;
+    std::vector<double> expected_adjustable_constant_scales(RoAffineExpression const& expression) const;
+    double expected_constant(RoAffineExpression const& expression) const;
+
+
+private:
+    ROModel const& model() const;
+
+private:
+    ROModel const& _model;
+};
+
+
+
 class AffineAdjustablePolicySolver : public solvers::AROPolicySolverBase {
 public:
     explicit AffineAdjustablePolicySolver(ROModel const& model);
@@ -77,7 +95,7 @@ private:
 
     solvers::SOCSolverBase& soc_solver();
 
-    std::vector<SOCVariable::Reference> const& adjustable_factors(DecisionVariable::Index id) const;
+    SOCVariable::Reference const& adjustable_factor(DecisionVariable::Dependency const& dependency) const;
 
     SOCVariable::Reference const& adjustable_constant(DecisionVariable::Index id) const;
 

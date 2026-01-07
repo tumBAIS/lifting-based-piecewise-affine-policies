@@ -88,19 +88,28 @@ target_link_libraries(TestHelpers ${CMAKE_THREAD_LIBS_INIT})
 # Lifting Tests
 ###############
 
-# Robust Inventory Instances
+# Inventory Robust & Stochastic Tests
 
 file(GLOB_RECURSE ROBUST_INVENTORY_TEST_INCLUDE "tests/lifting_tests/robust_inventory/*.h")
 file(GLOB_RECURSE ROBUST_INVENTORY_TEST_SOURCES "tests/lifting_tests/robust_inventory/*.cpp")
-add_executable(RobustInventoryTestServiceLevel tests/lifting_tests/inventory_test_service_level.cpp
-        ${ROBUST_INVENTORY_TEST_INCLUDE} ${ROBUST_INVENTORY_TEST_SOURCES})
-target_link_libraries(RobustInventoryTestServiceLevel TestHelpers)
 
-# Data Driven Inventory Instances
+add_executable(RobustInventoryTest tests/lifting_tests/inventory_test.cpp
+        ${ROBUST_INVENTORY_TEST_INCLUDE} ${ROBUST_INVENTORY_TEST_SOURCES})
+target_link_libraries(RobustInventoryTest TestHelpers)
+
+# Inventory Data Driven Tests
 
 file(GLOB_RECURSE DATA_DRIVEN_INVENTORY_TEST_INCLUDE "tests/lifting_tests/data_driven_inventory/*.h")
 file(GLOB_RECURSE DATA_DRIVEN_INVENTORY_TEST_SOURCES "tests/lifting_tests/data_driven_inventory/*.cpp")
+
 add_executable(DataDrivenInventoryTest tests/lifting_tests/data_driven_inventory_test.cpp
         ${DATA_DRIVEN_INVENTORY_TEST_INCLUDE} ${DATA_DRIVEN_INVENTORY_TEST_SOURCES})
 target_link_libraries(DataDrivenInventoryTest TestHelpers)
 
+# Inventory Dynamic Programming Benchmark
+
+file(GLOB_RECURSE DP_INVENTORY_TEST_INCLUDE "tests/lifting_tests/dp_inventory/*.h")
+file(GLOB_RECURSE DP_INVENTORY_TEST_SOURCES "tests/lifting_tests/dp_inventory/*.cpp")
+add_executable(InventoryDynamicProgramming tests/lifting_tests/inventory_dynamic_programming.cpp
+        ${DP_INVENTORY_TEST_INCLUDE} ${DP_INVENTORY_TEST_SOURCES})
+target_link_libraries(InventoryDynamicProgramming TestHelpers)
