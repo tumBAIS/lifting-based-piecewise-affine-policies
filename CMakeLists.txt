@@ -40,33 +40,33 @@ message(${CPP_GUROBI_LIBRARY})
 # Helpers
 #########
 
-file(GLOB_RECURSE HELPERS_INCLUDE "helpers/*.h")
-file(GLOB_RECURSE HELPERS_TEMPLATES "helpers/*.tplt")
-file(GLOB_RECURSE HELPERS_SOURCES "helpers/*.cpp")
-add_library(Helpers ${HELPERS_INCLUDE} ${HELPERS_TEMPLATES} ${HELPERS_SOURCES})
+file(GLOB_RECURSE HELPERS_INCLUDE "src/helpers/*.h")
+file(GLOB_RECURSE HELPERS_TEMPLATES "src/helpers/*.tplt")
+file(GLOB_RECURSE HELPERS_SOURCES "src/helpers/*.cpp")
+add_library(helpers ${HELPERS_INCLUDE} ${HELPERS_TEMPLATES} ${HELPERS_SOURCES})
 
 
 ########
 # Models
 ########
 
-file(GLOB_RECURSE MODELS_INCLUDE "models/*.h")
-file(GLOB_RECURSE MODELS_TEMPLATES "models/*.tplt")
-file(GLOB_RECURSE MODELS_SOURCES "models/*.cpp")
-add_library(Models ${MODELS_INCLUDE} ${MODELS_TEMPLATES} ${MODELS_SOURCES})
-target_link_libraries(Models PRIVATE Helpers)
+file(GLOB_RECURSE MODELS_INCLUDE "src/models/*.h")
+file(GLOB_RECURSE MODELS_TEMPLATES "src/models/*.tplt")
+file(GLOB_RECURSE MODELS_SOURCES "src/models/*.cpp")
+add_library(models ${MODELS_INCLUDE} ${MODELS_TEMPLATES} ${MODELS_SOURCES})
+target_link_libraries(models PRIVATE helpers)
 
 
 #########
 # Solvers
 #########
 
-file(GLOB_RECURSE SOLVERS_INCLUDE "solvers/*.h")
-file(GLOB_RECURSE SOLVERS_TEMPLATES "solvers/*.tplt")
-file(GLOB_RECURSE SOLVERS_SOURCES "solvers/*.cpp")
-add_library(Solvers ${SOLVERS_INCLUDE} ${SOLVERS_TEMPLATES} ${SOLVERS_SOURCES})
-target_link_libraries(Solvers PRIVATE Helpers Models)
-target_link_libraries(Solvers PRIVATE
+file(GLOB_RECURSE SOLVERS_INCLUDE "src/solvers/*.h")
+file(GLOB_RECURSE SOLVERS_TEMPLATES "src/solvers/*.tplt")
+file(GLOB_RECURSE SOLVERS_SOURCES "src/solvers/*.cpp")
+add_library(solvers ${SOLVERS_INCLUDE} ${SOLVERS_TEMPLATES} ${SOLVERS_SOURCES})
+target_link_libraries(solvers PRIVATE helpers models)
+target_link_libraries(solvers PRIVATE
         optimized ${CPP_GUROBI_LIBRARY}
         debug ${CPP_GUROBI_LIBRARY_DEBUG}
         general ${GUROBI_LIBRARY})
@@ -76,11 +76,11 @@ target_link_libraries(Solvers PRIVATE
 # Test Helpers
 ##############
 
-file(GLOB_RECURSE TEST_HELPERS_INCLUDE "tests/test_helpers/*.h")
-file(GLOB_RECURSE TEST_HELPERS_TEMPLATES "tests/test_helpers/*.tplt")
-file(GLOB_RECURSE TEST_HELPERS_SOURCES "tests/test_helpers/*.cpp")
+file(GLOB_RECURSE TEST_HELPERS_INCLUDE "src/tests/test_helpers/*.h")
+file(GLOB_RECURSE TEST_HELPERS_TEMPLATES "src/tests/test_helpers/*.tplt")
+file(GLOB_RECURSE TEST_HELPERS_SOURCES "src/tests/test_helpers/*.cpp")
 add_library(TestHelpers ${TEST_HELPERS_INCLUDE} ${TEST_HELPERS_TEMPLATES} ${TEST_HELPERS_SOURCES})
-target_link_libraries(TestHelpers PUBLIC Helpers Models Solvers)
+target_link_libraries(TestHelpers PUBLIC helpers models solvers)
 target_link_libraries(TestHelpers ${CMAKE_THREAD_LIBS_INIT})
 
 
@@ -90,26 +90,26 @@ target_link_libraries(TestHelpers ${CMAKE_THREAD_LIBS_INIT})
 
 # Inventory Robust & Stochastic Tests
 
-file(GLOB_RECURSE ROBUST_INVENTORY_TEST_INCLUDE "tests/lifting_tests/robust_inventory/*.h")
-file(GLOB_RECURSE ROBUST_INVENTORY_TEST_SOURCES "tests/lifting_tests/robust_inventory/*.cpp")
+file(GLOB_RECURSE ROBUST_INVENTORY_TEST_INCLUDE "src/tests/lifting_tests/robust_inventory/*.h")
+file(GLOB_RECURSE ROBUST_INVENTORY_TEST_SOURCES "src/tests/lifting_tests/robust_inventory/*.cpp")
 
-add_executable(RobustInventoryTest tests/lifting_tests/inventory_test.cpp
+add_executable(RobustInventoryTest src/tests/lifting_tests/inventory_test.cpp
         ${ROBUST_INVENTORY_TEST_INCLUDE} ${ROBUST_INVENTORY_TEST_SOURCES})
 target_link_libraries(RobustInventoryTest TestHelpers)
 
 # Inventory Data Driven Tests
 
-file(GLOB_RECURSE DATA_DRIVEN_INVENTORY_TEST_INCLUDE "tests/lifting_tests/data_driven_inventory/*.h")
-file(GLOB_RECURSE DATA_DRIVEN_INVENTORY_TEST_SOURCES "tests/lifting_tests/data_driven_inventory/*.cpp")
+file(GLOB_RECURSE DATA_DRIVEN_INVENTORY_TEST_INCLUDE "src/tests/lifting_tests/data_driven_inventory/*.h")
+file(GLOB_RECURSE DATA_DRIVEN_INVENTORY_TEST_SOURCES "src/tests/lifting_tests/data_driven_inventory/*.cpp")
 
-add_executable(DataDrivenInventoryTest tests/lifting_tests/data_driven_inventory_test.cpp
+add_executable(DataDrivenInventoryTest src/tests/lifting_tests/data_driven_inventory_test.cpp
         ${DATA_DRIVEN_INVENTORY_TEST_INCLUDE} ${DATA_DRIVEN_INVENTORY_TEST_SOURCES})
 target_link_libraries(DataDrivenInventoryTest TestHelpers)
 
 # Inventory Dynamic Programming Benchmark
 
-file(GLOB_RECURSE DP_INVENTORY_TEST_INCLUDE "tests/lifting_tests/dp_inventory/*.h")
-file(GLOB_RECURSE DP_INVENTORY_TEST_SOURCES "tests/lifting_tests/dp_inventory/*.cpp")
-add_executable(InventoryDynamicProgramming tests/lifting_tests/inventory_dynamic_programming.cpp
+file(GLOB_RECURSE DP_INVENTORY_TEST_INCLUDE "src/tests/lifting_tests/dp_inventory/*.h")
+file(GLOB_RECURSE DP_INVENTORY_TEST_SOURCES "src/tests/lifting_tests/dp_inventory/*.cpp")
+add_executable(InventoryDynamicProgramming src/tests/lifting_tests/inventory_dynamic_programming.cpp
         ${DP_INVENTORY_TEST_INCLUDE} ${DP_INVENTORY_TEST_SOURCES})
 target_link_libraries(InventoryDynamicProgramming TestHelpers)
