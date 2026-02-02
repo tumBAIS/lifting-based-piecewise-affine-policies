@@ -3,9 +3,9 @@
 This repository implements piecewise affine decision rules using the concept of liftings.
 It provides all relevant code to reproduce the numerical results presented in the paper.
 
-> Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann. (2024).
+> Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann. (2026).
 > A Note on Piecewise Affine Decision Rules for Robust, Stochastic, and Data-Driven Optimization.
-> *arXiv*. [https://doi.org/10.48550/arXiv.2409.10295](https://doi.org/10.48550/arXiv.2409.10295)
+> *Operations Research*. [https://doi.org/10.1287/opre.2024.1344](https://doi.org/10.1287/opre.2024.1344)
 
 Most of the solvers only implement the special cases needed for the numerical experiments yet.
 We are happy to collaborate on making this a more general-purpose library.
@@ -61,14 +61,10 @@ We are happy to collaborate on making this a more general-purpose library.
 
 ## Usage
 
-The repository is structured in three parts:
-1. `models` contains a relatively general framework to model robust optimization and second-order cone problems.
-2. `solver` implements all solvers compared in the numerical experiments of the paper.
-3. `tests` implements the numeric test instances presented in the paper.
-
-## Contribution Guidelines
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+The code of this repository is structured in three parts:
+1. `src/models` contains a relatively general framework to model robust optimization and second-order cone problems.
+2. `src/solver` implements all solvers compared in the numerical experiments of the paper.
+3. `src/tests` implements the numeric test instances presented in the paper.
 
 ## Licensing
 
@@ -77,10 +73,27 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE.txt) 
 For more information on the MIT License, please visit [Open Source Initiative](https://opensource.org/licenses/MIT).
 ## Citing This Work
 
-If you use this code in your work, please cite the accompanying paper:
-> Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann. (2024).
-> A Note on Piecewise Affine Decision Rules for Robust, Stochastic, and Data-Driven Optimization.
-> *arXiv*. [https://doi.org/10.48550/arXiv.2409.10295](https://doi.org/10.48550/arXiv.2409.10295)
+If you use this code in your work, please cite this repository:
+```
+@misc{Thomae2026CD,
+  author =        {Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann},
+  publisher =     {Operations Research},
+  title =         {A Note on Piecewise Affine Decision Rules for Robust, Stochastic, and Data-Driven Optimization},
+  year =          {2026},
+  doi =           {10.1287/opre.2024.1344.cd},
+  note =          {Available for download at https://github.com/ORJournal/2024.1344},
+}  
+```
+and the accompanying paper:
+```
+@article{Thomae2026,
+  author =        {Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann},
+  publisher =     {Operations Research},
+  title =         {A Note on Piecewise Affine Decision Rules for Robust, Stochastic, and Data-Driven Optimization},
+  year =          {2026},
+  doi =           {10.1287/opre.2024.1344},
+}  
+```
 
 ## Contact Information
 
