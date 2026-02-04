@@ -168,7 +168,7 @@ std::string test(Parameter const& parameter) {
 
 
 int main() {
-    std::string run_name = "data_driven_inventory_revision_" + helpers::time_stamp();
+    std::string run_name = "data_driven_inventory_" + helpers::time_stamp();
     std::ofstream output_stream("../results/" + run_name + ".csv");
     helpers::global_logger.set_logfile("../logs/" + run_name + ".log");
     ParameterIterator iterator;

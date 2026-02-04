@@ -5,7 +5,7 @@
 int
 main(int argc,
      char *argv[]) {
-    std::string run_name = "inventory_test_lifting_" + helpers::time_stamp();
+    std::string run_name = "robust_stochastic_inventory_" + helpers::time_stamp();
     helpers::global_logger.set_logfile("../logs/" + run_name + ".log");
     helpers::global_logger << "Logging " + run_name;
     std::ofstream output_stream("../results/" + run_name + ".csv");
