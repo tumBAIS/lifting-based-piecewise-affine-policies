@@ -1,0 +1,247 @@
+---
+title: "Data Analysis"
+output: html_notebook
+---
+
+```{r, message = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+library(tikzDevice)
+library(xtable)
+```
+
+```{r}
+custom_colors <- c("AFF" = "red", "LIFT1" = "darkblue", "LIFT3" = "darkgreen", "LIFT1 CG" = "darkblue", "LIFT3 CG" = "darkgreen", "LIFTF" = "darkviolet", "GLIFT1" = "darkblue", "GLIFT3" = "darkgreen", "GLIFTF" = "darkviolet", "LIFT3\'"="orange",  "GLIFT3\'"="orange",  "LIFT3\' CG"="orange")
+custom_shapes <- c("AFF" = 4, "LIFT1" = 16, "LIFT3" = 15, "LIFT3\'" = 18, "LIFT1 CG" = 10, "LIFT3 CG" = 12, "LIFT3\' CG" = 9, "LIFTF" = 17, "GLIFT1" = 1, "GLIFT3" = 0, "GLIFT3\'" = 5, "GLIFTF" = 2)
+```
+
+
+# Reading results data
+
+```{r}
+ro_so_data <- read.csv("../results/robust_stochastic_inventory.csv", sep=";", stringsAsFactors = FALSE) %>% select(-avg_samples, -budget, -uncertainty_type) %>% 
+  dplyr::rename(corr = alpha) %>% dplyr::mutate(test_name=recode(test_name, "LIFTG0"="GLIFT1", "LIFTGF"="GLIFTF", "LIFTGE4"="GLIFT3", "LIFTE4"="LIFT3", "LIFTGK4"="GLIFT3\'", "LIFTE4"="LIFT3", "LIFT0"="LIFT1", "DLIFT4"="LIFT3 CG", "DLIFT0"="LIFT1 CG", "DLIFTK4"="LIFT3\' CG", "GLIFTK4" ="GLIFT3\'", "LIFTK4"="LIFT3\'")) %>% dplyr::mutate(uncertainty=recode(uncertainty, "STOCHASTIC"="stochastic", "MULTI_AVERAGE"="robust"))
+ro_so_data$test_name = factor(ro_so_data$test_name, levels = c("AFF", "GLIFT1", "GLIFT3", "GLIFT3\'", "GLIFTF", "LIFT1", "LIFT1 CG", "LIFT3", "LIFT3 CG", "LIFT3\'", "LIFT3\' CG", "LIFTF"))
+```
+
+```{r}
+dp_data <- read.csv("../results/dp_test.csv") %>% dplyr::rename(corr = alpha, dp_objective = value, num_stages=T, uncertainty=robust) %>% dplyr::mutate(uncertainty=recode(uncertainty, '1'="robust", '0'="stochastic"))
+dp_data$iteration = 0
+```
+
+```{r}
+dd_data <- read.csv("../results/data_driven_inventory.csv", sep=";") %>% dplyr::rename(trainsize=train_size, correlation=alpha) %>% dplyr::mutate(method=recode(method, " LIFTE"="LIFT3", " AFF"="AFF"))
+```
+
+# Robust Optimization & Stochastic Programming
+
+## Stochastic Programming
+### Performance
+```{r}
+y_limit = 1.79
+
+performance <- inner_join(
+  ro_so_data %>% dplyr::filter((test_name %in% c("AFF", "GLIFT1", "GLIFT3", "GLIFT3\'", "GLIFTF", "LIFT1", "LIFT3", "LIFT3\'", "LIFTF"))), 
+  dp_data %>% filter(discretization==2.5), 
+  by=c("num_stages", "corr", "iteration", "uncertainty")) %>% 
+  mutate(rel_ov=objective/dp_objective) %>%  
+  group_by(num_stages, corr, test_name, uncertainty) %>%
+  dplyr::summarise(mean_relative_objective = mean(rel_ov), .groups="drop") %>%
+  dplyr::filter(uncertainty=="stochastic")%>% mutate(mean_relative_objective_adjust = pmin(mean_relative_objective, y_limit-.05)) %>% 
+  ggplot(aes(x=num_stages, y=mean_relative_objective_adjust, color=test_name)) + 
+  geom_line(data = . %>% filter(mean_relative_objective_adjust >= mean_relative_objective), linewidth=1, alpha=.3) + 
+  geom_line(data = . %>% filter(test_name == "AFF"), linewidth=1, alpha=.3, linetype="dashed", show.legend = FALSE) + 
+  geom_point(aes(shape=test_name), alpha=.4, size=2.5) +
+  geom_text(data = . %>% filter(mean_relative_objective_adjust<mean_relative_objective) ,
+            aes(x=num_stages, y=mean_relative_objective_adjust, 
+                label = paste0(as.character(round((mean_relative_objective-1)*100)), "\\%"),
+                hjust =  (num_stages - 12.5) / 30 + .5
+                ), 
+            vjust=-1.3, color="black", size=3) +
+  geom_segment(data = . %>% filter(mean_relative_objective_adjust < mean_relative_objective),
+                 aes(xend = num_stages,
+                     yend = mean_relative_objective_adjust + .04, x=num_stages, y=mean_relative_objective_adjust),
+                 arrow=arrow(length=unit(0.15,"cm")), color="black"
+                 ) +
+  facet_grid(,vars(corr), labeller = labeller(corr = function(x) paste("$\\alpha = ", x, "$"))) +
+  theme_bw() + labs(title = "", x="$T$", y="optimality gap", color="policy", shape="policy") +
+  theme(panel.grid.minor = element_blank()) + 
+  scale_x_continuous(breaks=c(5, 10, 15, 20), labels=c("5", "10", "15", "20")) + 
+  scale_y_continuous(trans="log", breaks=seq(1,y_limit,by=.1), limits=c(1,y_limit), labels = paste0(as.character((seq(1,y_limit,by=.1)-1)*100), "\\%")) + 
+  scale_color_manual(values = custom_colors) +
+  scale_shape_manual(values = custom_shapes)
+
+#tikz(file = "inventory_so_performance.tex", width = 8, height = 4)
+#x11(width = 8, height = 4)
+plot_grid(performance, ncol = 1, align = 'v')
+#x11()
+#dev.off()
+```
+
+### Runtime
+```{r}
+ro_so_data %>% dplyr::filter(uncertainty=="stochastic") %>%
+  group_by(num_stages, test_name) %>%
+  dplyr::summarise(mean_runtime = mean(runtime), .groups="drop") %>% 
+  pivot_wider(names_from = test_name, values_from = mean_runtime) %>% rename(T = num_stages)  %>% round(digits = 3) %>%   mutate(T = as.integer(T)) %>% 
+  xtable %>% print(include.rownames = FALSE, include.comments = FALSE)
+```
+
+## Robust Optimization
+### Performance
+```{r}
+y_limit = 1.79
+
+performance <- inner_join(
+  ro_so_data %>% dplyr::filter((test_name %in% c("AFF", "LIFT1", "LIFT3", "LIFT3\'", "LIFTF"))), 
+  dp_data %>% filter(discretization==2.5), 
+  by=c("num_stages", "corr", "iteration", "uncertainty")) %>% 
+  mutate(rel_ov=objective/dp_objective) %>%  
+  group_by(num_stages, corr, test_name, uncertainty) %>%
+  dplyr::summarise(mean_relative_objective = mean(rel_ov), .groups="drop") %>%
+  dplyr::filter(uncertainty=="robust")%>% mutate(mean_relative_objective_adjust = pmin(mean_relative_objective, y_limit-.05)) %>% 
+  ggplot(aes(x=num_stages, y=mean_relative_objective_adjust, color=test_name)) + 
+  geom_line(data = . %>% filter(mean_relative_objective_adjust >= mean_relative_objective), linewidth=1, alpha=.3) + 
+  geom_point(aes(shape=test_name), alpha=.4, size=2.5) +
+  facet_grid(,vars(corr), labeller = labeller(corr = function(x) paste("$\\alpha = ", x, "$"))) +
+  theme_bw() + labs(title = "", x="$T$", y="optimality gap", color="policy", shape="policy") +
+  theme(panel.grid.minor = element_blank()) + 
+  scale_x_continuous(breaks=c(5, 10, 15, 20), labels=c("5", "10", "15", "20")) + 
+  scale_y_continuous(trans="log", breaks=seq(1,y_limit,by=.1), limits=c(1,y_limit), labels = paste0(as.character((seq(1,y_limit,by=.1)-1)*100), "\\%")) + 
+  scale_color_manual(values = custom_colors) +
+  scale_shape_manual(values = custom_shapes)
+
+#tikz(file = "inventory_ro_performance.tex", width = 8, height = 4)
+#x11(width = 8, height = 4)
+plot_grid(performance, ncol = 1, align = 'v')
+#x11()
+#dev.off()
+```
+
+### Runtime
+```{r}
+ro_so_data %>% dplyr::filter(uncertainty=="robust") %>%
+  group_by(num_stages, test_name) %>%
+  dplyr::summarise(mean_runtime = mean(runtime), .groups="drop") %>% 
+  pivot_wider(names_from = test_name, values_from = mean_runtime) %>% rename(T = num_stages)  %>% round(digits = 3) %>%   mutate(T = as.integer(T)) %>% 
+  xtable %>% print(include.rownames = FALSE, include.comments = FALSE)
+```
+
+## Column Generation Performance
+```{r}
+base_data <- ro_so_data %>% 
+  filter(test_name %in% c("LIFT1", "LIFT3", "LIFT3\'")) %>% 
+  select(test_name, num_stages, corr, iteration, objective, uncertainty) %>% 
+  dplyr::rename(base_ov = objective)
+
+cg_data <- ro_so_data %>% 
+  filter(test_name %in% c("LIFT1 CG", "LIFT3 CG", "LIFT3\' CG")) %>% 
+  select(test_name, num_stages, corr, iteration, objective, uncertainty) %>% 
+  dplyr::rename(cg_ov = objective) %>% dplyr::mutate(test_name=recode(test_name, "LIFT1 CG"="LIFT1", "LIFT3 CG"="LIFT3", "LIFT3\' CG"="LIFT3\'"))
+
+performance <- inner_join(base_data, cg_data, by=c("test_name", "num_stages", "corr", "iteration", "uncertainty")) %>% 
+  mutate(rel_ov=(base_ov/cg_ov-1)*100) %>%  
+  group_by(num_stages, corr, test_name, uncertainty) %>%
+  dplyr::summarise(mean_relative_objective = mean(rel_ov), .groups="drop") %>%
+  #dplyr::filter(uncertainty=="STOCHASTIC")%>% 
+  dplyr::mutate(uncertainty=recode(uncertainty, "STOCHASTIC"="stochastic", "MULTI_AVERAGE"="robust")) %>% 
+  ggplot(aes(x=num_stages, y=mean_relative_objective, color=test_name)) + 
+  geom_line(linewidth=1, alpha=.3) + geom_point(aes(shape=test_name), alpha=.4, size=2.5) +
+  facet_grid(vars(uncertainty),vars(corr), labeller = labeller(corr = function(x) paste("$\\alpha = ", x, "$"), uncertainty = function(x) x)) +
+  theme_bw() + labs(title = "", x="$T$", y="Improvement", color="policy", shape="policy") +
+  theme(panel.grid.minor = element_blank()) + 
+  scale_x_continuous(breaks=c(5, 10, 15, 20), labels=c("5", "10", "15", "20")) + 
+  scale_y_continuous( breaks=seq(0,5,by=1), labels = paste0(as.character(seq(0,5,by=1)), "\\%")) + 
+  scale_color_manual(values = custom_colors) +
+  scale_shape_manual(values = custom_shapes)
+
+#tikz(file = "inventory_cg_performance.tex", width = 8, height = 4)
+#x11(width = 8, height = 4)
+plot_grid(performance, ncol = 1, align = 'v')
+#x11()
+#dev.off()
+```
+
+# Data Driven Inventory Management
+
+```{r}
+hline_data <- dp_data %>% filter(uncertainty == "stochastic", num_stages==5, discretization==2.5) %>% mutate(correlation = corr)
+```
+
+## Performance
+```{r}
+performance <- dd_data %>% dplyr::filter(correlation==.25, method %in% c("AFF", "LIFT3"), cross_validation=="AV") %>% 
+  group_by(method, trainsize,  radius) %>% 
+  mutate(radius=radius+1e-4) %>% 
+  dplyr::summarise(mean_test_perf = mean(test_mean),  
+                   P20 = quantile(test_mean, 0.20),
+                   P80 = quantile(test_mean, 0.80),
+                   mean_train_perf = mean(train_mean),
+                   .groups="drop") %>% 
+  ggplot(aes(x=radius, color=method)) + 
+  geom_ribbon(aes(ymin=P20, ymax=P80, fill=method), alpha=.2) + 
+  geom_line(aes(y=mean_test_perf)) + 
+  geom_line(aes(y=mean_train_perf), linetype=2) + 
+  geom_point(aes(y=mean_test_perf, shape=method)) + 
+  geom_hline(data=hline_data %>% filter(correlation==.25), aes(yintercept = dp_objective), linewidth=1) + 
+  facet_grid(,vars(trainsize), labeller = labeller(trainsize = function(x) paste0("$N = ", x, "$"))) +
+  theme_bw() + 
+  labs(title = "", x="$\\epsilon$", y="", color="policy", shape="policy", fill="policy") +
+  theme(panel.grid.minor = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  scale_x_continuous(trans="log10", breaks=10**(-4:1), labels=append(c(0), 10**(-3:1))) + 
+  scale_y_continuous(trans = "log10", limits = c(23,250)) + 
+  scale_color_manual(values = custom_colors) +
+  scale_shape_manual(values = custom_shapes)
+
+#tikz(file = "dd_inventory_performance.tex", width = 8, height = 4)
+#x11(width = 8, height = 4)
+plot_grid(performance, ncol = 1, align = 'v')
+#x11()
+#dev.off()
+```
+
+## CV Performance
+```{r}
+dd_data %>% filter(method %in% c("AFF", "LIFT3"), cross_validation=="CV", radius > 0) %>% group_by(method, trainsize) %>% 
+  summarise(n(), .groups="drop", min(train_time/trainsize), max(train_time/trainsize), traintime= round(mean(train_time),2), feasible=paste0(round(100-100*mean(test_valid), 1), "%")) %>% rename(N = trainsize) %>% select(method, N, traintime, feasible) %>% 
+  pivot_wider(names_from = method, values_from = c(traintime, feasible)) %>% mutate(N = as.integer(N)) %>% 
+  select(
+    N,
+    traintime_AFF, feasible_AFF,
+    traintime_LIFT3, feasible_LIFT3
+  ) %>% 
+   xtable() %>% print(include.rownames = FALSE, include.comments = FALSE)
+```
+
+```{r}
+performance <- dd_data %>% dplyr::filter(cross_validation=="CV") %>% 
+  group_by(method, trainsize,  correlation) %>% 
+  dplyr::summarise(mean_test_perf = mean(test_mean),  
+                   P20 = quantile(test_mean, 0.20),
+                   P80 = quantile(test_mean, 0.80),
+                   mean_train_perf = mean(train_mean),
+                   .groups="drop") %>% 
+  ggplot(aes(x=trainsize, color=method)) + 
+  geom_ribbon(aes(ymin=P20, ymax=P80, fill=method), alpha=.2) + 
+  geom_line(aes(y=mean_test_perf)) + 
+  geom_line(aes(y=mean_train_perf), linetype=2) + 
+  geom_point(aes(y=mean_test_perf, shape=method)) + 
+  facet_grid(,vars(correlation), labeller = labeller(correlation = function(x) paste("$\\alpha = ", x, "$"))) +
+  geom_hline(data=hline_data, aes(yintercept = dp_objective), linewidth=1) + 
+  theme_bw() + 
+  labs(title = "", x="$N$", y="", color="policy", shape="policy", fill="policy") +
+  theme(panel.grid.minor = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  scale_x_continuous(breaks=c(10, 25, 50, 100), labels=c(10, 25, 50, 100)) +
+  scale_y_continuous(trans = "log10") + 
+  scale_color_manual(values = custom_colors) +
+  scale_shape_manual(values = custom_shapes)
+
+#tikz(file = "dd_cv_inventory_performance.tex", width = 8, height = 4)
+#x11(width = 8, height = 4)
+plot_grid(performance, ncol = 1, align = 'v')
+#x11()
+#dev.off()
+```
+
+
