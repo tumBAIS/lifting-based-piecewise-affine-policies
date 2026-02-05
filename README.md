@@ -90,7 +90,8 @@ and the accompanying paper:
 ```
 @article{Thomae2026,
   author =        {Simon Thomä, Maximilian Schiffer, Wolfram Wiesemann},
-  publisher =     {Operations Research},
+  journal =       {Operations Research},
+  publisher =     {Institute for Operations Research and the Management Sciences (INFORMS)},
   title =         {A Note on Piecewise Affine Decision Rules for Robust, Stochastic, and Data-Driven Optimization},
   year =          {2026},
   doi =           {10.1287/opre.2024.1344},
