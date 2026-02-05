@@ -185,7 +185,7 @@ performance <- dd_data %>% dplyr::filter(correlation==.25, method %in% c("AFF", 
   geom_line(aes(y=mean_train_perf), linetype=2) + 
   geom_point(aes(y=mean_test_perf, shape=method)) + 
   geom_hline(data=hline_data %>% filter(correlation==.25), aes(yintercept = dp_objective), linewidth=1) + 
-  facet_grid(,vars(trainsize), labeller = labeller(trainsize = function(x) paste0("$N = ", x, "$"))) +
+  facet_grid(,vars(trainsize), labeller = labeller(trainsize = function(x) paste0("$G = ", x, "$"))) +
   theme_bw() + 
   labs(title = "", x="$\\epsilon$", y="", color="policy", shape="policy", fill="policy") +
   theme(panel.grid.minor = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) + 
@@ -204,10 +204,10 @@ plot_grid(performance, ncol = 1, align = 'v')
 ## CV Performance
 ```{r}
 dd_data %>% filter(method %in% c("AFF", "LIFT3"), cross_validation=="CV", radius > 0) %>% group_by(method, trainsize) %>% 
-  summarise(n(), .groups="drop", min(train_time/trainsize), max(train_time/trainsize), traintime= round(mean(train_time),2), feasible=paste0(round(100-100*mean(test_valid), 1), "%")) %>% rename(N = trainsize) %>% select(method, N, traintime, feasible) %>% 
-  pivot_wider(names_from = method, values_from = c(traintime, feasible)) %>% mutate(N = as.integer(N)) %>% 
+  summarise(n(), .groups="drop", min(train_time/trainsize), max(train_time/trainsize), traintime= round(mean(train_time),2), feasible=paste0(round(100-100*mean(test_valid), 1), "%")) %>% rename(G = trainsize) %>% select(method, G, traintime, feasible) %>% 
+  pivot_wider(names_from = method, values_from = c(traintime, feasible)) %>% mutate(G = as.integer(G)) %>% 
   select(
-    N,
+    G,
     traintime_AFF, feasible_AFF,
     traintime_LIFT3, feasible_LIFT3
   ) %>% 
@@ -230,7 +230,7 @@ performance <- dd_data %>% dplyr::filter(cross_validation=="CV") %>%
   facet_grid(,vars(correlation), labeller = labeller(correlation = function(x) paste("$\\alpha = ", x, "$"))) +
   geom_hline(data=hline_data, aes(yintercept = dp_objective), linewidth=1) + 
   theme_bw() + 
-  labs(title = "", x="$N$", y="", color="policy", shape="policy", fill="policy") +
+  labs(title = "", x="$G$", y="", color="policy", shape="policy", fill="policy") +
   theme(panel.grid.minor = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) + 
   scale_x_continuous(breaks=c(10, 25, 50, 100), labels=c(10, 25, 50, 100)) +
   scale_y_continuous(trans = "log10") + 
