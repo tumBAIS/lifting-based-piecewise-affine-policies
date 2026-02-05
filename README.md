@@ -66,6 +66,8 @@ The code of this repository is structured in three parts:
 2. `src/solver` implements all solvers compared in the numerical experiments of the paper.
 3. `src/tests` implements the numeric test instances presented in the paper.
 
+`results` contains the raw output data of the tests and `scripts` contains the R-Markdown script used to generate the plots and tables.
+
 ## Licensing
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.txt) file for details.
